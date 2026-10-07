@@ -1,8 +1,6 @@
-import hashlib, hmac, os, secrets, smtplib, urllib.parse, json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 from pathlib import Path
 from typing import Optional
 
@@ -31,12 +29,8 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/auth/google/callback')
-SMTP_HOST = os.getenv('SMTP_HOST', '')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
-SMTP_USER = os.getenv('SMTP_USER', '')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
-SMTP_FROM = os.getenv('SMTP_FROM', SMTP_USER)
-
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+EMAIL_FROM = os.getenv('EMAIL_FROM', '').strip()
 app = FastAPI(title='QIC RGUKT Quantum Portal API', version='2.0.0')
 origins = [x.strip() for x in os.getenv('CORS_ORIGINS', f'{FRONTEND_URL},http://localhost:5173,http://127.0.0.1:5173').split(',') if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
@@ -236,16 +230,54 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-
 def send_otp(email: str, code: str):
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD and SMTP_FROM):
-        raise RuntimeError('Email delivery is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and SMTP_FROM.')
-    msg = EmailMessage(); msg['Subject'] = 'QIC verification code'; msg['From'] = SMTP_FROM; msg['To'] = email
-    msg.set_content(f'Your QIC verification code is {code}. It expires in 10 minutes. If you did not request this, ignore this email.')
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
-        server.starttls(); server.login(SMTP_USER, SMTP_PASSWORD); server.send_message(msg)
+    import urllib.request
+    import urllib.error
 
+    if not RESEND_API_KEY or not EMAIL_FROM:
+        raise RuntimeError(
+            'Email delivery is not configured. '
+            'Set RESEND_API_KEY and EMAIL_FROM.'
+        )
+
+    payload = json.dumps({
+        'from': EMAIL_FROM,
+        'to': [email],
+        'subject': 'QIC verification code',
+        'text': (
+            f'Your QIC verification code is {code}. '
+            'It expires in 10 minutes. '
+            'If you did not request this, ignore this email.'
+        )
+    }).encode('utf-8')
+
+    request = urllib.request.Request(
+        'https://api.resend.com/emails',
+        data=payload,
+        headers={
+            'Authorization': f'Bearer {RESEND_API_KEY}',
+            'Content-Type': 'application/json'
+        },
+        method='POST'
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status >= 300:
+                raise RuntimeError(
+                    f'Email provider returned HTTP {response.status}'
+                )
+
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode('utf-8', errors='replace')
+        raise RuntimeError(
+            f'Email provider error: {error_body}'
+        ) from exc
+
+    except Exception as exc:
+        raise RuntimeError(
+            f'Email delivery failed: {exc}'
+        ) from exc
 
 def current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials: raise HTTPException(401, 'Authentication required')
