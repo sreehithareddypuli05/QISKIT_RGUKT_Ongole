@@ -5,10 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
   ChevronDown,
   GraduationCap,
-  KeyRound,
   Loader2,
   Mail,
   LockKeyhole,
@@ -28,7 +26,7 @@ const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 const field = 'qic-field';
 
-const steps = ['Account', 'Verify', 'Profile'];
+const steps = ['Account', 'Profile'];
 
 const inputVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -79,18 +77,13 @@ export default function LoginForm({
     profileOnly ? 'register' : 'register'
   );
 
-  const [step, setStep] = useState(profileOnly ? 2 : 0);
+  const [step, setStep] = useState(profileOnly ? 1 : 0);
 
   const [busy, setBusy] = useState(false);
-
   const [msg, setMsg] = useState('');
 
-  const [resend, setResend] = useState(0);
-
   const [states, setStates] = useState<string[]>([]);
-
   const [colleges, setColleges] = useState<any[]>([]);
-
 
   const [form, setForm] = useState<any>(() => {
     let pending: any = {};
@@ -106,7 +99,6 @@ export default function LoginForm({
       last_name: pending.last_name || '',
       email: pending.email || '',
       password: '',
-      code: '',
       country: 'India',
       state: '',
       college: '',
@@ -154,15 +146,6 @@ export default function LoginForm({
   }, [form.state]);
 
 
-  useEffect(() => {
-    if (!resend) return;
-
-    const t = setInterval(() => setResend((v) => v - 1), 1000);
-
-    return () => clearInterval(t);
-  }, [resend]);
-
-
   const set = (k: string, v: any) =>
     setForm((f: any) => ({
       ...f,
@@ -185,7 +168,6 @@ export default function LoginForm({
 
     try {
       const r = await authService.googleStart();
-
       window.location.href = r.url;
     } catch (e) {
       setMsg(
@@ -199,78 +181,42 @@ export default function LoginForm({
   };
 
 
-  const requestCode = async (e: FormEvent) => {
+  // Account -> Profile
+  const nextToProfile = (e: FormEvent) => {
     e.preventDefault();
 
     setMsg('');
+
+    if (!form.first_name.trim()) {
+      setMsg('Please enter your first name.');
+      return;
+    }
+
+    if (!form.last_name.trim()) {
+      setMsg('Please enter your last name.');
+      return;
+    }
+
+    if (!form.email.trim()) {
+      setMsg('Please enter your email address.');
+      return;
+    }
 
     if (form.password.length < 8) {
       setMsg('Use a password with at least 8 characters.');
       return;
     }
 
-    setBusy(true);
-
-    try {
-      await authService.requestVerification({
+    sessionStorage.setItem(
+      'qic.pending.profile',
+      JSON.stringify({
         first_name: form.first_name,
         last_name: form.last_name,
         email: form.email,
-        password: form.password,
-      });
+      })
+    );
 
-      setResend(30);
-
-      setStep(1);
-    } catch (e) {
-      setMsg(
-        e instanceof AuthError
-          ? e.message
-          : 'Unable to send the verification code.'
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-
-  const verify = async (e: FormEvent) => {
-    e.preventDefault();
-
-    setBusy(true);
-    setMsg('');
-
-    try {
-      const r = await authService.verify({
-        email: form.email,
-        code: form.code,
-      });
-
-      saveSession(r, true);
-
-      sessionStorage.setItem(
-        'qic.pending.profile',
-        JSON.stringify({
-          first_name: form.first_name,
-          last_name: form.last_name,
-          email: form.email,
-        })
-      );
-
-      setUser(r.user);
-
-      nav('/profile-setup', {
-        replace: true,
-      });
-    } catch (e) {
-      setMsg(
-        e instanceof AuthError
-          ? e.message
-          : 'Invalid verification code.'
-      );
-    } finally {
-      setBusy(false);
-    }
+    setStep(1);
   };
 
 
@@ -297,18 +243,13 @@ export default function LoginForm({
 
       const u = await authService.me();
 
-      localStorage.setItem(
-        'qic.auth.user',
-        JSON.stringify(u)
-      );
+      localStorage.setItem('qic.auth.user', JSON.stringify(u));
 
       sessionStorage.removeItem('qic.pending.profile');
 
       setUser(u);
 
-      nav('/dashboard', {
-        replace: true,
-      });
+      nav('/dashboard', { replace: true });
     } catch (e) {
       setMsg(
         e instanceof AuthError
@@ -338,9 +279,7 @@ export default function LoginForm({
 
       setUser(r.user);
 
-      nav('/dashboard', {
-        replace: true,
-      });
+      nav('/dashboard', { replace: true });
     } catch (e) {
       setMsg(
         e instanceof AuthError
@@ -362,6 +301,7 @@ export default function LoginForm({
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_28px_90px_-55px_rgba(15,23,42,.35)]">
 
+      {/* Progress */}
       <div className="border-b border-slate-100 bg-[#fbfcfd] px-5 py-5 sm:px-8">
         <div className="mx-auto max-w-4xl">
 
@@ -380,11 +320,7 @@ export default function LoginForm({
                       : 'border-slate-200 bg-white text-slate-400'
                   }`}
                 >
-                  {i < step ? (
-                    <CheckCircle2 size={16} />
-                  ) : (
-                    i + 1
-                  )}
+                  {i + 1}
                 </span>
 
                 <span
@@ -413,19 +349,12 @@ export default function LoginForm({
 
           </div>
 
-
           <div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-200">
-
             <motion.div
               className="h-full bg-[#1e568a]"
-              animate={{
-                width: `${progress}%`,
-              }}
-              transition={{
-                duration: 0.45,
-              }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.45 }}
             />
-
           </div>
 
         </div>
@@ -436,32 +365,20 @@ export default function LoginForm({
 
         <AnimatePresence mode="wait">
 
-
+          {/* LOGIN */}
           {!profileOnly && mode === 'login' ? (
 
             <motion.form
               key="login"
               onSubmit={login}
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="mx-auto max-w-xl"
             >
 
               <div className="mb-8">
-
-                <p className="eyebrow">
-                  MEMBER ACCESS
-                </p>
+                <p className="eyebrow">MEMBER ACCESS</p>
 
                 <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">
                   Welcome back
@@ -470,16 +387,12 @@ export default function LoginForm({
                 <p className="mt-2 text-slate-500">
                   Sign in to open your QIC profile and participation dashboard.
                 </p>
-
               </div>
 
 
               <div className="grid gap-5">
 
-                <Field
-                  label="Email address"
-                  icon={Mail}
-                >
+                <Field label="Email address" icon={Mail}>
                   <input
                     className={field}
                     type="email"
@@ -544,8 +457,7 @@ export default function LoginForm({
 
 
               <p className="mt-6 text-center text-sm text-slate-500">
-
-                New here?
+                New here?{' '}
 
                 <button
                   type="button"
@@ -558,29 +470,19 @@ export default function LoginForm({
                 >
                   Create an account
                 </button>
-
               </p>
 
             </motion.form>
 
-
           ) : !profileOnly && step === 0 ? (
 
+            /* ACCOUNT */
             <motion.form
               key="register"
-              onSubmit={requestCode}
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
+              onSubmit={nextToProfile}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
             >
 
               <div className="mx-auto max-w-4xl">
@@ -596,7 +498,7 @@ export default function LoginForm({
                   </h2>
 
                   <p className="mt-2 max-w-2xl text-slate-500">
-                    Use your real email. We verify it before creating your account.
+                    Enter your account details and continue to complete your profile.
                   </p>
 
                 </div>
@@ -663,7 +565,6 @@ export default function LoginForm({
                 </div>
 
 
-                {/* EMAIL FIELD — VERIFICATION BUTTON REMOVED */}
                 <div className="mt-5">
 
                   <Field
@@ -711,9 +612,29 @@ export default function LoginForm({
                 </div>
 
 
+                {/* NEXT BUTTON */}
+                <button
+                  type="submit"
+                  className="btn btn-primary mt-8 w-full !rounded-xl !py-4"
+                  disabled={busy}
+                >
+                  {busy ? (
+                    <Loader2
+                      className="animate-spin"
+                      size={17}
+                    />
+                  ) : (
+                    <ArrowRight size={17} />
+                  )}
+
+                  Next
+                  <ArrowRight size={17} />
+                </button>
+
+
                 <p className="mt-7 text-center text-sm text-slate-500">
 
-                  Already registered?
+                  Already registered?{' '}
 
                   <button
                     type="button"
@@ -729,148 +650,22 @@ export default function LoginForm({
 
             </motion.form>
 
-
-          ) : step === 1 ? (
-
-            <motion.form
-              key="verify"
-              onSubmit={verify}
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-              className="mx-auto max-w-xl"
-            >
-
-              <div className="mb-8 text-center">
-
-                <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#e8f0f7] text-[#1e568a]">
-                  <KeyRound size={24} />
-                </span>
-
-                <p className="eyebrow mt-5">
-                  STEP 2 · VERIFY
-                </p>
-
-                <h2 className="mt-2 text-3xl font-semibold">
-                  Check your email
-                </h2>
-
-                <p className="mt-2 text-slate-500">
-                  Enter the 6-digit code sent to{' '}
-                  <strong className="text-slate-900">
-                    {form.email}
-                  </strong>
-                  . It expires in 10 minutes.
-                </p>
-
-              </div>
-
-
-              <label className="block">
-
-                <input
-                  className={`${field} text-center text-2xl font-semibold tracking-[.5em]`}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  placeholder="000000"
-                  value={form.code}
-                  onChange={(e) =>
-                    set(
-                      'code',
-                      e.target.value.replace(/\D/g, '')
-                    )
-                  }
-                  required
-                />
-
-              </label>
-
-
-              <button
-                className="btn btn-primary mt-5 w-full !rounded-xl !py-3.5"
-                disabled={busy || form.code.length !== 6}
-              >
-
-                {busy ? (
-                  <Loader2
-                    className="animate-spin"
-                    size={17}
-                  />
-                ) : (
-                  <CheckCircle2 size={17} />
-                )}
-
-                Verify & continue
-
-              </button>
-
-
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-
-                <button
-                  type="button"
-                  onClick={() => setStep(0)}
-                  className="btn btn-ghost flex-1"
-                >
-                  <ArrowLeft size={16} />
-                  Change details
-                </button>
-
-
-                <button
-                  type="button"
-                  disabled={busy || resend > 0}
-                  onClick={() =>
-                    requestCode({
-                      preventDefault: () => {},
-                    } as any)
-                  }
-                  className="btn btn-ghost flex-1"
-                >
-                  {resend > 0
-                    ? `Resend in ${resend}s`
-                    : 'Resend code'}
-                </button>
-
-              </div>
-
-            </motion.form>
-
-
           ) : (
 
+            /* PROFILE */
             <motion.form
               key="profile"
               onSubmit={complete}
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="mx-auto max-w-4xl"
             >
 
               <div className="mb-8">
 
                 <p className="eyebrow">
-                  STEP 3 · PROFILE
+                  STEP 2 · PROFILE
                 </p>
 
                 <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">
@@ -1090,10 +885,7 @@ export default function LoginForm({
                     className={`${field} mt-3`}
                     value={form.quantum_level}
                     onChange={(e) =>
-                      set(
-                        'quantum_level',
-                        e.target.value
-                      )
+                      set('quantum_level', e.target.value)
                     }
                   >
                     <option>Beginner</option>
@@ -1121,38 +913,29 @@ export default function LoginForm({
 
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
 
-                  {['Python', 'C++', 'Java', 'Others'].map(
-                    (x) => (
-                      <label
-                        key={x}
-                        className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition ${
-                          form.programming_languages.includes(
-                            x
-                          )
-                            ? 'border-[#9bbbd8] bg-[#f3f7fb] text-[#153e63]'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
+                  {['Python', 'C++', 'Java', 'Others'].map((x) => (
+                    <label
+                      key={x}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                        form.programming_languages.includes(x)
+                          ? 'border-[#9bbbd8] bg-[#f3f7fb] text-[#153e63]'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
 
-                        <input
-                          className="accent-[#1e568a]"
-                          type="checkbox"
-                          checked={form.programming_languages.includes(
-                            x
-                          )}
-                          onChange={() =>
-                            toggle(
-                              'programming_languages',
-                              x
-                            )
-                          }
-                        />
+                      <input
+                        className="accent-[#1e568a]"
+                        type="checkbox"
+                        checked={form.programming_languages.includes(x)}
+                        onChange={() =>
+                          toggle('programming_languages', x)
+                        }
+                      />
 
-                        {x}
+                      {x}
 
-                      </label>
-                    )
-                  )}
+                    </label>
+                  ))}
 
                 </div>
 
@@ -1193,9 +976,7 @@ export default function LoginForm({
                       <input
                         className="accent-[#1e568a]"
                         type="checkbox"
-                        checked={form.activities.includes(
-                          x
-                        )}
+                        checked={form.activities.includes(x)}
                         onChange={() =>
                           toggle('activities', x)
                         }
@@ -1222,10 +1003,7 @@ export default function LoginForm({
                     placeholder="Enter referral code"
                     value={form.referral_code}
                     onChange={(e) =>
-                      set(
-                        'referral_code',
-                        e.target.value
-                      )
+                      set('referral_code', e.target.value)
                     }
                   />
                 </Field>
@@ -1242,7 +1020,7 @@ export default function LoginForm({
                     if (profileOnly) {
                       nav('/');
                     } else {
-                      setStep(1);
+                      setStep(0);
                     }
                   }}
                 >
@@ -1285,14 +1063,8 @@ export default function LoginForm({
 
         {msg && (
           <motion.div
-            initial={{
-              opacity: 0,
-              y: 8,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             role="alert"
             className="mx-auto mt-6 max-w-4xl rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
           >
@@ -1331,11 +1103,7 @@ function BookIcon() {
 
 
 function CalendarIcon() {
-  return (
-    <span className="text-[#1e568a]">
-      •
-    </span>
-  );
+  return <span className="text-[#1e568a]">•</span>;
 }
 
 
