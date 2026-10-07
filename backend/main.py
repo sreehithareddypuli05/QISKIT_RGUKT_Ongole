@@ -255,8 +255,9 @@ def send_otp(email: str, code: str):
         'https://api.resend.com/emails',
         data=payload,
         headers={
-            'Authorization': f'Bearer {RESEND_API_KEY}',
-            'Content-Type': 'application/json'
+        'Authorization': f'Bearer {RESEND_API_KEY}',
+        'Content-Type': 'application/json',
+        'User-Agent': 'QIC-RGUKT-Ongole/1.0'
         },
         method='POST'
     )
