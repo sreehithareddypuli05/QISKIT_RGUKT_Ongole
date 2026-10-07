@@ -182,30 +182,41 @@ export default function LoginForm({
 
 
   // Account -> Profile
-  const nextToProfile = (e: FormEvent) => {
-    e.preventDefault();
+ const nextToProfile = async (e: FormEvent) => {
+  e.preventDefault();
+  setMsg('');
 
-    setMsg('');
+  if (!form.first_name.trim()) {
+    setMsg('Please enter your first name.');
+    return;
+  }
 
-    if (!form.first_name.trim()) {
-      setMsg('Please enter your first name.');
-      return;
-    }
+  if (!form.last_name.trim()) {
+    setMsg('Please enter your last name.');
+    return;
+  }
 
-    if (!form.last_name.trim()) {
-      setMsg('Please enter your last name.');
-      return;
-    }
+  if (!form.email.trim()) {
+    setMsg('Please enter your email address.');
+    return;
+  }
 
-    if (!form.email.trim()) {
-      setMsg('Please enter your email address.');
-      return;
-    }
+  if (form.password.length < 8) {
+    setMsg('Use a password with at least 8 characters.');
+    return;
+  }
 
-    if (form.password.length < 8) {
-      setMsg('Use a password with at least 8 characters.');
-      return;
-    }
+  setBusy(true);
+
+  try {
+    const r = await authService.register({
+      first_name: form.first_name,
+      last_name: form.last_name,
+      email: form.email,
+      password: form.password,
+    });
+
+    saveSession(r, true);
 
     sessionStorage.setItem(
       'qic.pending.profile',
@@ -216,8 +227,18 @@ export default function LoginForm({
       })
     );
 
+    setUser(r.user);
     setStep(1);
-  };
+  } catch (e) {
+    setMsg(
+      e instanceof AuthError
+        ? e.message
+        : 'Unable to create your account.'
+    );
+  } finally {
+    setBusy(false);
+  }
+};
 
 
   const complete = async (e: FormEvent) => {

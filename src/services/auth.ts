@@ -8,6 +8,7 @@ export const clearSession=()=>{localStorage.removeItem(TOKEN);localStorage.remov
 export const readUser=():AuthUser|null=>{try{return JSON.parse(localStorage.getItem(USER)||sessionStorage.getItem(USER)||'null')}catch{return null}};
 async function request(path:string,init?:RequestInit){const res=await fetch(API_BASE+path,{...init,headers:{'Content-Type':'application/json',...(token()?{Authorization:`Bearer ${token()}`}:{}) ,...(init?.headers||{})}});const data=await res.json().catch(()=>({}));if(!res.ok)throw new AuthError(data.detail||data.message||'Request failed.');return data}
 export const authService={
+ register:(body:any)=>request('/api/auth/register',{method:'POST',body:JSON.stringify(body)}),
  requestVerification:(body:any)=>request('/api/auth/request-verification',{method:'POST',body:JSON.stringify(body)}),
  verify:(body:any)=>request('/api/auth/verify-verification',{method:'POST',body:JSON.stringify(body)}),
  login:(body:any)=>request('/api/auth/login',{method:'POST',body:JSON.stringify(body)}),

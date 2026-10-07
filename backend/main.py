@@ -325,7 +325,80 @@ def verify_verification(body: VerifyCodeRequest):
     execute(conn, 'INSERT INTO users(id,first_name,last_name,email,password_hash,verified,profile_complete,role,created_at) VALUES (?,?,?,?,?,?,?,?,?)', (user_id,row['first_name'],row['last_name'],email,row['password_hash'],1,0,'user',datetime.now(timezone.utc).isoformat()))
     execute(conn, 'DELETE FROM pending_registrations WHERE email=?',(email,)); conn.commit(); conn.close()
     return {'message':'Email verified. Continue with your academic profile.','token':token_for(user_id,email),'user':{'id':user_id,'name':f"{row['first_name']} {row['last_name']}",'email':email,'profile_complete':False}}
+@app.post('/api/auth/register')
+def register(body: RegisterRequest):
+    email = str(body.email).lower().strip()
 
+    conn = db()
+
+    existing = execute(
+        conn,
+        'SELECT id FROM users WHERE email=?',
+        (email,)
+    ).fetchone()
+
+    if existing:
+        conn.close()
+        raise HTTPException(
+            409,
+            'An account with this email already exists. Please log in.'
+        )
+
+    user_id = secrets.token_hex(16)
+
+    execute(
+        conn,
+        '''
+        INSERT INTO users(
+            id,
+            first_name,
+            last_name,
+            email,
+            password_hash,
+            verified,
+            profile_complete,
+            role,
+            created_at
+        )
+        VALUES (?,?,?,?,?,?,?,?,?)
+        ''',
+        (
+            user_id,
+            body.first_name.strip(),
+            body.last_name.strip(),
+            email,
+            hash_password(body.password),
+            1,
+            0,
+            'user',
+            datetime.now(timezone.utc).isoformat()
+        )
+    )
+
+    execute(
+        conn,
+        'INSERT INTO user_activity(user_id,event,created_at) VALUES (?,?,?)',
+        (
+            user_id,
+            'registration',
+            datetime.now(timezone.utc).isoformat()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        'message': 'Account created successfully.',
+        'token': token_for(user_id, email, 'user'),
+        'user': {
+            'id': user_id,
+            'name': f'{body.first_name.strip()} {body.last_name.strip()}',
+            'email': email,
+            'role': 'user',
+            'profile_complete': False
+        }
+    }
 @app.post('/api/auth/login')
 def login(body: LoginRequest):
     email=str(body.email).lower().strip(); conn=db(); row=execute(conn, 'SELECT * FROM users WHERE email=?',(email,)).fetchone()
