@@ -1,6 +1,16 @@
 import { Link } from 'react-router-dom';
 import type { CSSProperties } from 'react';
-import { ArrowRight, CalendarDays, Code2, Globe2, Handshake, Lightbulb, MapPin, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarDays,
+  Code2,
+  Globe2,
+  Handshake,
+  Lightbulb,
+  MapPin,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import PageTransition from '../components/PageTransition';
 import FallFestCarousel from '../components/FallFestCarousel';
 import ExternalLink from '../components/ExternalLink';
@@ -8,7 +18,7 @@ import Reveal from '../components/Reveal';
 import { LINKS } from '../data/content';
 import { useSeo } from '../hooks/useSeo';
 
-const tracks = [
+const tracks: [string, string, LucideIcon][] = [
   ['Quantique Hackathon', 'A challenge-oriented track for building and presenting quantum computing ideas.', Code2],
   ['QuantumXpo', 'A project expo where teams demonstrate quantum and quantum-adjacent projects.', Lightbulb],
   ['Quantum Startup Summit', 'A bridge between quantum technology, entrepreneurship and the emerging ecosystem.', Handshake],
@@ -51,13 +61,13 @@ export default function QiskitFallFest() {
 
         <section className="wrap py-16 sm:py-24">
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              [CalendarDays,'5–9 Oct','2026 festival dates'],
-              [Globe2,'Global','Part of Qiskit Fall Fest'],
-              [Users,'Student-led','Community-driven format'],
-              [MapPin,'RGUKT Nuzvid','Andhra Pradesh'],
-            ].map(([Icon,value,label]) => {
-              const I = Icon as typeof CalendarDays;
+            {([
+              [CalendarDays, '5–9 Oct', '2026 festival dates'],
+              [Globe2, 'Global', 'Part of Qiskit Fall Fest'],
+              [Users, 'Student-led', 'Community-driven format'],
+              [MapPin, 'RGUKT Nuzvid', 'Andhra Pradesh'],
+            ] as [LucideIcon, string, string][]).map(([Icon, value, label]) => {
+              const I = Icon;
               return <div key={String(value)} className="border-t border-slate-200 py-6"><I size={20} className="text-navy-q"/><p className="mt-5 text-2xl font-semibold">{value}</p><p className="mt-1 text-sm text-slate-500">{label}</p></div>;
             })}
           </div>
@@ -81,9 +91,8 @@ export default function QiskitFallFest() {
           <p className="eyebrow">RGUKT EDITION</p>
           <h2 className="mt-3 text-3xl font-semibold sm:text-5xl">What happens at the fest?</h2>
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            {tracks.map(([title,text,Icon]) => {
-              const I = Icon as typeof Code2;
-              return <div key={String(title)} className="border-t border-slate-200 py-7 transition-transform duration-500 hover:translate-y-[-3px]"><I size={21} className="text-navy-q"/><h3 className="mt-6 text-xl font-semibold">{title}</h3><p className="mt-3 leading-7 text-slate-500">{text}</p></div>;
+            {tracks.map(([title, text, Icon]) => {
+              return <div key={String(title)} className="border-t border-slate-200 py-7 transition-transform duration-500 hover:translate-y-[-3px]"><Icon size={21} className="text-navy-q"/><h3 className="mt-6 text-xl font-semibold">{title}</h3><p className="mt-3 leading-7 text-slate-500">{text}</p></div>;
             })}
           </div>
         </section>
